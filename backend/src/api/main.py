@@ -25,6 +25,12 @@ def create_app() -> FastAPI:
     # Load settings once (cached by get_settings), primarily for env validation
     get_settings()
 
+    # Set default logging level to INFO if not explicitly configured
+    if not logging.getLogger().hasHandlers():
+        logging.basicConfig(level=logging.INFO)
+    else:
+        logging.getLogger().setLevel(logging.INFO)
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         # Startup

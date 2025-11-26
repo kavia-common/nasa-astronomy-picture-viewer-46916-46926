@@ -22,5 +22,6 @@ class APODQuery(BaseModel):
     """
     Pydantic schema for APOD query parameters.
     """
+    # We keep field name 'date' but note that the route uses Query(alias="apod_date")
     date: date_type | None = Field(default=None, description="Specific date to request (YYYY-MM-DD).")
     hd: bool = Field(default=False, description="Request HD image if available.")

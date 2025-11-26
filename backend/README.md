@@ -15,6 +15,7 @@ FastAPI backend providing NASA Astronomy Picture of the Day (APOD) with cache-fi
 - NASA_API_KEY: NASA API key (defaults to DEMO_KEY if not set)
 - DATABASE_URL: SQLAlchemy DB URL (defaults to sqlite:///./apod_cache.db)
 - PORT: Server port (defaults to 3001)
+- REQUEST_TIMEOUT_MS: Optional timeout for outbound NASA API calls in milliseconds (default 20000)
 
 Optional (affects CORS):
 - ALLOWED_ORIGINS: Comma-separated list of allowed origins (overrides others).
