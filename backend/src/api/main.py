@@ -87,6 +87,10 @@ def create_app() -> FastAPI:
     ]
     allowed_origins.extend([o for o in localhost_defaults])
 
+    # Ensure the running QA frontend origin is explicitly allowed (scheme+host+port must match)
+    qa_origin = "https://vscode-internal-29464-qa.qa01.cloud.kavia.ai:3000"
+    allowed_origins.append(qa_origin)
+
     # Remove duplicates while preserving order
     seen = set()
     allowed_origins = [o for o in allowed_origins if not (o in seen or seen.add(o))]
@@ -94,13 +98,16 @@ def create_app() -> FastAPI:
     # Methods/headers may also be supplied via env to keep parity with deployment constraints
     allow_methods_env = os.getenv("CORS_ALLOW_METHODS", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
     allow_headers_env = os.getenv("CORS_ALLOW_HEADERS", "*")
-    allow_credentials_env = os.getenv("CORS_ALLOW_CREDENTIALS", "true").strip().lower() in ("1", "true", "yes", "on")
+    # If credentials are not needed (no cookies/auth), disable to allow wildcard '*' behavior elsewhere if desired.
+    allow_credentials_env = os.getenv("CORS_ALLOW_CREDENTIALS", "false").strip().lower() in ("1", "true", "yes", "on")
 
     allow_methods_list = _parse_allowed_list(allow_methods_env)
     # For allow_headers, if '*', pass through wildcard, else split list
     allow_headers_value = allow_headers_env.strip()
     allow_headers_list: list[str] | list = ["*"] if allow_headers_value == "*" else _parse_allowed_list(allow_headers_value)
 
+    # Starlette CORSMiddleware requires allow_origins to be explicit (not ["*"]) when allow_credentials=True.
+    # We already provide explicit origins including the QA origin above.
     logging.info(
         "CORS configuration",
         extra={
