@@ -56,42 +56,67 @@ def create_app() -> FastAPI:
     # 1) ALLOWED_ORIGINS (comma-separated)
     # 2) REACT_* env vars if set
     # 3) localhost dev defaults
+    def _parse_allowed_list(raw: str) -> list[str]:
+        # Split on comma/space, strip, drop empties
+        parts: list[str] = []
+        for token in raw.replace("\n", ",").split(","):
+            t = token.strip()
+            if t:
+                parts.append(t)
+        return parts
+
     allowed_origins: List[str] = []
 
-    # Parse comma-separated list if provided
+    # Parse comma-separated list if provided (e.g., "https://a, https://b")
     allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
     if allowed_origins_env.strip():
-        allowed_origins.extend([o.strip() for o in allowed_origins_env.split(",") if o.strip()])
+        allowed_origins.extend(_parse_allowed_list(allowed_origins_env))
 
     # Fall back to commonly provided frontend URL envs
     for var in ["REACT_APP_FRONTEND_URL", "REACT_APP_BACKEND_URL", "REACT_APP_API_BASE", "FRONTEND_URL"]:
         v = os.getenv(var)
         if v:
-            allowed_origins.append(v.strip())
+            allowed_origins.extend(_parse_allowed_list(v))
 
-    # Always include common localhost origins for dev
+    # Always include common localhost origins for dev (non-duplicates)
     localhost_defaults = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "https://localhost:3000",
         "https://127.0.0.1:3000",
     ]
-    for origin in localhost_defaults:
-        if origin not in allowed_origins:
-            allowed_origins.append(origin)
+    allowed_origins.extend([o for o in localhost_defaults])
 
     # Remove duplicates while preserving order
     seen = set()
     allowed_origins = [o for o in allowed_origins if not (o in seen or seen.add(o))]
 
+    # Methods/headers may also be supplied via env to keep parity with deployment constraints
+    allow_methods_env = os.getenv("CORS_ALLOW_METHODS", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+    allow_headers_env = os.getenv("CORS_ALLOW_HEADERS", "*")
+    allow_credentials_env = os.getenv("CORS_ALLOW_CREDENTIALS", "true").strip().lower() in ("1", "true", "yes", "on")
+
+    allow_methods_list = _parse_allowed_list(allow_methods_env)
+    # For allow_headers, if '*', pass through wildcard, else split list
+    allow_headers_value = allow_headers_env.strip()
+    allow_headers_list: list[str] | list = ["*"] if allow_headers_value == "*" else _parse_allowed_list(allow_headers_value)
+
+    logging.info(
+        "CORS configuration",
+        extra={
+            "allow_origins": allowed_origins,
+            "allow_methods": allow_methods_list,
+            "allow_headers": allow_headers_list,
+            "allow_credentials": allow_credentials_env,
+        },
+    )
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
-        allow_credentials=True,
-        # Explicit methods typical for browser/API use, ensures preflight correctness
-        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        # Allow commonly used headers; wildcard is ok but enumerate typical ones for clarity
-        allow_headers=["*"],
+        allow_credentials=allow_credentials_env,
+        allow_methods=allow_methods_list if allow_methods_list else ["GET", "OPTIONS"],
+        allow_headers=allow_headers_list if allow_headers_list else ["*"],
         expose_headers=["*"],
     )
 
