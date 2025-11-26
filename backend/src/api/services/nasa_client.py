@@ -19,6 +19,14 @@ class NASAClientError(Exception):
     """Raised when NASA API returns an error or the request fails."""
 
 
+class UpstreamTimeout(NASAClientError):
+    """Raised when the NASA API request times out."""
+
+
+class UpstreamRateLimited(NASAClientError):
+    """Raised when the NASA API responds with HTTP 429 (rate limited)."""
+
+
 def _resolve_timeout() -> float:
     """
     Determine request timeout in seconds from REQUEST_TIMEOUT_MS if provided,
@@ -50,6 +58,8 @@ async def fetch_apod(apod_date: date | None = None, hd: bool = False) -> dict[st
 
     Raises:
         NASAClientError: If the request fails or NASA API returns an error.
+        UpstreamTimeout: If the request to NASA times out.
+        UpstreamRateLimited: If NASA returns HTTP 429.
     """
     settings = get_settings()
     api_key = settings.nasa_api_key or "DEMO_KEY"
@@ -62,14 +72,17 @@ async def fetch_apod(apod_date: date | None = None, hd: bool = False) -> dict[st
         params["date"] = apod_date.isoformat()
 
     timeout = _resolve_timeout()
-    logger.info("Calling NASA APOD", extra={"url": NASA_APOD_URL, "params": {k: v for k, v in params.items() if k != "api_key"}, "timeout_s": timeout})
+    logger.info(
+        "Calling NASA APOD",
+        extra={"url": NASA_APOD_URL, "params": {k: v for k, v in params.items() if k != "api_key"}, "timeout_s": timeout},
+    )
 
     async with httpx.AsyncClient(timeout=timeout) as client:
         try:
             resp = await client.get(NASA_APOD_URL, params=params)
         except httpx.TimeoutException as e:
             logger.warning("NASA APOD request timed out", extra={"timeout_s": timeout})
-            raise NASAClientError(f"Network timeout contacting NASA API (timeout {timeout}s)") from e
+            raise UpstreamTimeout(f"Network timeout contacting NASA API (timeout {timeout}s)") from e
         except httpx.HTTPError as e:
             logger.warning("NASA APOD network error", extra={"error": str(e)})
             raise NASAClientError(f"Network error contacting NASA API: {e}") from e
@@ -84,9 +97,11 @@ async def fetch_apod(apod_date: date | None = None, hd: bool = False) -> dict[st
             "NASA APOD HTTP error",
             extra={"status": resp.status_code, "body": detail if isinstance(detail, dict) else str(detail)[:500]},
         )
-        # If NASA returns 400 due to invalid date format or out-of-range, surface as client error
         if resp.status_code == 400:
+            # Invalid client input upstream (e.g., invalid date string)
             raise NASAClientError(f"Bad request to NASA API: {detail}")
+        if resp.status_code == 429:
+            raise UpstreamRateLimited("NASA API rate limit exceeded (HTTP 429)")
         raise NASAClientError(f"NASA API error {resp.status_code}: {detail}")
 
     try:

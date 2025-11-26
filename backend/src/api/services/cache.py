@@ -30,7 +30,7 @@ def get_cached_apod(db: Session, apod_date: date, hd: bool) -> dict[str, Any] | 
     if not row:
         return None
 
-    return {
+    data: dict[str, Any] = {
         "date": row.date,
         "title": row.title,
         "explanation": row.explanation,
@@ -40,6 +40,10 @@ def get_cached_apod(db: Session, apod_date: date, hd: bool) -> dict[str, Any] | 
         "service_version": row.service_version,
         "copyright": row.copyright,
     }
+    # If row is a fallback, include marker so callers can surface indicator
+    if getattr(row, "is_fallback", 0):
+        data["fallback"] = True
+    return data
 
 
 # PUBLIC_INTERFACE
@@ -49,7 +53,7 @@ def set_cached_apod(db: Session, apod: dict[str, Any], hd: bool) -> None:
 
     Args:
         db: SQLAlchemy session.
-        apod: Dict of APOD fields from NASA.
+        apod: Dict of APOD fields from NASA or a local fallback.
         hd: Whether HD version was requested.
     """
     date_val = apod.get("date")
@@ -59,6 +63,7 @@ def set_cached_apod(db: Session, apod: dict[str, Any], hd: bool) -> None:
         .filter(APODCache.hd == (1 if hd else 0))
         .first()
     )
+    is_fallback_flag = 1 if apod.get("fallback") else 0
     if row:
         row.title = apod.get("title", row.title)
         row.explanation = apod.get("explanation", row.explanation)
@@ -67,6 +72,9 @@ def set_cached_apod(db: Session, apod: dict[str, Any], hd: bool) -> None:
         row.media_type = apod.get("media_type", row.media_type)
         row.service_version = apod.get("service_version", row.service_version)
         row.copyright = apod.get("copyright", row.copyright)
+        # Update fallback marker if present
+        if hasattr(row, "is_fallback"):
+            row.is_fallback = is_fallback_flag
     else:
         row = APODCache(
             date=date_val,
@@ -79,5 +87,8 @@ def set_cached_apod(db: Session, apod: dict[str, Any], hd: bool) -> None:
             service_version=apod.get("service_version"),
             copyright=apod.get("copyright"),
         )
+        # Set fallback marker on insert if model supports it
+        if hasattr(row, "is_fallback"):
+            row.is_fallback = is_fallback_flag
         db.add(row)
     db.commit()

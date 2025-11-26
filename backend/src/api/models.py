@@ -24,6 +24,8 @@ class APODCache(Base):
     service_version: Mapped[str | None] = mapped_column(String, nullable=True)
     copyright: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # Optional marker to indicate local fallback entry
+    is_fallback: Mapped[int] = mapped_column(Integer, default=0)  # 0=False, 1=True
 
     __table_args__ = (
         UniqueConstraint("date", "hd", name="uq_apod_date_hd"),

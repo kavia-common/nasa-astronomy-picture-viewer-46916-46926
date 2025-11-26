@@ -16,6 +16,8 @@ class APODResponse(BaseModel):
     media_type: str = Field(default="image", description="Type of media: image or video.")
     service_version: str | None = Field(default=None, description="API service version.")
     copyright: str | None = Field(default=None, description="Content copyright owner.")
+    # Indicates that this payload is a local fallback due to upstream 429/timeout
+    fallback: bool | None = Field(default=None, description="True if this APOD is a local fallback due to upstream limits.")
 
 
 class APODQuery(BaseModel):
