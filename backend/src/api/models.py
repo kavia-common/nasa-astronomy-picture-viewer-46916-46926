@@ -14,7 +14,7 @@ class APODCache(Base):
     __tablename__ = "apod_cache"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    date: Mapped[date] = mapped_column(Date, index=True)
+    date: Mapped["date"] = mapped_column(Date, index=True)  # type: ignore[name-defined]
     hd: Mapped[int] = mapped_column(Integer, default=0)  # 0=False, 1=True
     title: Mapped[str] = mapped_column(String, nullable=False)
     explanation: Mapped[str] = mapped_column(String, nullable=False)
