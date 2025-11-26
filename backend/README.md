@@ -17,6 +17,7 @@ FastAPI backend providing NASA Astronomy Picture of the Day (APOD) with cache-fi
 - PORT: Server port (defaults to 3001)
 
 Optional (affects CORS):
+- ALLOWED_ORIGINS: Comma-separated list of allowed origins (overrides others).
 - REACT_APP_FRONTEND_URL
 - REACT_APP_BACKEND_URL
 - REACT_APP_API_BASE

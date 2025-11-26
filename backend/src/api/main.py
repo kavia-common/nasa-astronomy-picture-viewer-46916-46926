@@ -17,7 +17,7 @@ def create_app() -> FastAPI:
     Create and configure the FastAPI application for RetroSpace APOD Viewer.
 
     - Loads environment-based settings
-    - Configures CORS using frontend URL env vars or wildcard for local dev
+    - Configures CORS using ALLOWED_ORIGINS/REACT_* env vars with localhost defaults
     - Registers routes for APOD endpoints
     - Initializes database on startup and closes sessions on shutdown
     - Adds global error handling
@@ -46,23 +46,47 @@ def create_app() -> FastAPI:
     )
 
     # CORS configuration
+    # Priority order:
+    # 1) ALLOWED_ORIGINS (comma-separated)
+    # 2) REACT_* env vars if set
+    # 3) localhost dev defaults
     allowed_origins: List[str] = []
-    # Allow these env vars to control CORS if present
-    for var in ["REACT_APP_FRONTEND_URL", "REACT_APP_BACKEND_URL", "REACT_APP_API_BASE"]:
+
+    # Parse comma-separated list if provided
+    allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+    if allowed_origins_env.strip():
+        allowed_origins.extend([o.strip() for o in allowed_origins_env.split(",") if o.strip()])
+
+    # Fall back to commonly provided frontend URL envs
+    for var in ["REACT_APP_FRONTEND_URL", "REACT_APP_BACKEND_URL", "REACT_APP_API_BASE", "FRONTEND_URL"]:
         v = os.getenv(var)
         if v:
-            allowed_origins.append(v)
+            allowed_origins.append(v.strip())
 
-    if not allowed_origins:
-        # Default to wildcard for local dev
-        allowed_origins = ["*"]
+    # Always include common localhost origins for dev
+    localhost_defaults = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://localhost:3000",
+        "https://127.0.0.1:3000",
+    ]
+    for origin in localhost_defaults:
+        if origin not in allowed_origins:
+            allowed_origins.append(origin)
+
+    # Remove duplicates while preserving order
+    seen = set()
+    allowed_origins = [o for o in allowed_origins if not (o in seen or seen.add(o))]
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],
+        # Explicit methods typical for browser/API use, ensures preflight correctness
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        # Allow commonly used headers; wildcard is ok but enumerate typical ones for clarity
         allow_headers=["*"],
+        expose_headers=["*"],
     )
 
     # Health route

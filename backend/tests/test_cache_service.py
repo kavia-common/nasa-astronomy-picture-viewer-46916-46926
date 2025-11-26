@@ -1,5 +1,4 @@
 import types
-import pytest
 
 try:
     from src.services import cache as cache_service  # type: ignore

@@ -1,8 +1,4 @@
-import os
-import sys
-import types
 from typing import Generator
-from contextlib import contextmanager
 
 import pytest
 from fastapi import FastAPI
@@ -28,8 +24,6 @@ def _load_app() -> FastAPI:
             continue
 
     # Minimal shim if backend app cannot be imported in this environment
-    from fastapi import FastAPI
-
     shim = FastAPI(title="RetroSpace APOD Backend (Test Shim)")
     @shim.get("/", tags=["Health"], summary="Health Check")
     def health():

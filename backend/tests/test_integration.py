@@ -1,6 +1,3 @@
-import os
-import pytest
-
 def test_end_to_end_apod_flow(client, env_vars):
     """
     End-to-end: call health, then call APOD today and by date, verifying shape and caching repeat.
